@@ -1,5 +1,7 @@
 from manim import *
+import subprocess
 import numpy as np
+import cv2
 
 
 class Intro(Scene):
@@ -95,6 +97,10 @@ class Classroom(Scene):
         self.play(FadeIn(confused_text))
         self.play(FadeOut(confused_text))
         self.wait(0.5)
+        self.play(
+            *[FadeOut(mob) for mob in self.mobjects]
+        )
+        self.wait(1)
 
 
 def create_eyes(obj, buffer, *, flip=False):
@@ -115,6 +121,86 @@ class Overview(Scene):
         self.play(FadeIn(intro_title))
         self.wait(1)
         self.play(FadeOut(intro_title))
+        self.wait(0.5)
+        catchphrase = Text("Cars are relatable. Jargon is not.")
+        self.play(Write(catchphrase))
+        self.wait(1)
+        self.play(FadeOut(catchphrase))
+        self.wait(1)
+
+
+class Analogy(Scene):
+    def __init__(
+            self,
+            renderer=None,
+            camera_class=Camera,
+            always_update_mobjects=False,
+            random_seed=None,
+            skip_animations=False,
+    ):
+        super().__init__(renderer, camera_class, always_update_mobjects, random_seed, skip_animations)
+
+
+class ChemReaction(Analogy):
+    def construct(self):
+        car_left = SVGMobject("static/car.svg", height=2)
+        car_right = SVGMobject("static/car.svg", height=2).flip()
+        bus = SVGMobject("static/bus.svg", height=2)
+        cap = cv2.VideoCapture("static/explosion_fast.gif")
+
+        flag, frame = cap.read()
+        frame_img = ImageMobject(frame)
+
+        group = VGroup(car_left, car_right).arrange(buff=10)
+        car_right_clone = SVGMobject("static/car.svg", height=2).flip().set_x(car_right.get_x() + 0.2)
+        hydrogen = createBubble("H₂").set_x(car_right.get_x()).set_y(car_right.get_y())
+        oxygen = createBubble("O").set_x(car_left.get_x()).set_y(car_left.get_y())
+
+        def changeGap(obj: Mobject):
+            obj = VGroup(car_left, car_right).arrange(buff=gap.get_value())
+
+        def updatePos(obj: Mobject):
+            car_right_clone.set_x(car_right.get_x() + 0.2)
+            hydrogen.set_x(car_right.get_x()).set_y(car_right.get_y())
+            oxygen.set_x(car_left.get_x()).set_y(car_left.get_y())
+
+
+        gap = ValueTracker(10)
+
+        self.play(Write(group), Write(car_right_clone))
+        self.play(Write(hydrogen), Write(oxygen))
+        self.wait(0.5)
+
+        group.add_updater(changeGap)
+        car_right_clone.add_updater(updatePos)
+
+        self.play(gap.animate.set_value(-2).set_rate_func(rate_functions.linear))
+
+        h2o = createBubble("H₂O")
+        self.add(bus, h2o)
+        self.add(frame_img)
+        self.remove(car_left, car_right, car_right_clone, hydrogen, oxygen)
+        flag = True
+        while flag:
+            flag, frame = cap.read()
+            if not flag:
+                self.play(FadeOut(frame_img))
+            if flag:
+                self.remove(frame_img)
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                frame_img = ImageMobject(frame)
+                self.add(frame_img)
+                self.wait(0.1)
+        cap.release()
+        self.wait(1)
+        self.play(FadeOut(bus, h2o))
+
+
+def createBubble(text):
+    circle = Circle(radius=0.4, color=BLUE_E, fill_opacity=1)
+    text = Text(text, font_size=40).set_x(circle.get_x()).set_y(circle.get_y())
+    circle = Circle(radius=text.width / 2 + 0.05, color=BLUE_E, fill_opacity=1)
+    return VGroup(circle, text)
 
 
 class Video(Scene):
@@ -122,4 +208,5 @@ class Video(Scene):
         self.add_sound("static/sounds/Heartbeat.mp3")
         Intro.construct(self)
         Classroom.construct(self)
-
+        Overview.construct(self)
+        ChemReaction.construct(self)
