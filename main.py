@@ -176,6 +176,7 @@ class ChemReaction(Analogy):
 
         self.play(gap.animate.set_value(-2).set_rate_func(rate_functions.linear))
 
+        self.add_sound("static/sounds/explosion.mp3")
         h2o = createBubble("H₂O")
         self.add(bus, h2o)
         self.add(frame_img)
